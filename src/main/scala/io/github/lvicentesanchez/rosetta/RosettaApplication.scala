@@ -23,34 +23,39 @@ object RosettaApplication extends ApplicationLifecycle {
   val client: AmazonSQSAsync =
     new AmazonSQSAsyncClient()
 
-  val fn: () => Future[String \/ List[Request]] =
+  val fn: () => Future[String \/ List[String \/ Request]] =
     () =>
       Future.successful(
-        \/-(Iterator.range(0, 10).map(i => Request(UUID.randomUUID().toString, jString(s"Message $i :: ${DateTime.now}"))).toList)
+        \/-(Iterator.range(0, 10).map(i => \/-(Request(UUID.randomUUID().toString, jString(s"Message $i :: ${DateTime.now}")))).toList)
       )
   //() => sqs.produce("", new AmazonSQSAsyncClient())(20, 10)
 
-  val source: Source[String \/ List[Request]] =
+  val source: Source[String \/ List[String \/ Request]] =
     Source.concurrent(16, fn)
   //Source(() => Iterator.continually(())).mapAsync(_ => fn(system.dispatcher))
 
-  val errorSink: Sink[String] = Sink.foreach(println)
+  def errorSink: Sink[String] = Sink.foreach(println)
 
-  val rightFlow: Flow[List[Request], Request] =
-    Flow[List[Request]].
-      //transform(() => FlattenStage[List, Request])
+  val rightFlow: Flow[List[String \/ Request], String \/ Request] =
+    Flow[List[String \/ Request]].
       mapConcat(identity)
+  //transform(() => FlattenStage[List, Request])
 
   val rightSink: Sink[Request] = Sink.foreach(println)
 
   import FlowGraphImplicits._
 
   val graph = FlowGraph { implicit builder =>
-    val dj: DisjunctionRoute[String, List[Request]] = new DisjunctionRoute[String, List[Request]]
+    val dj0: DisjunctionRoute[String, List[String \/ Request]] = DisjunctionRoute[String, List[String \/ Request]]("disjunction-0")
+    val dj1: DisjunctionRoute[String, Request] = DisjunctionRoute[String, Request]("disjunction-1")
 
-    source ~> dj.in
-    dj.left ~> errorSink
-    dj.right ~> rightFlow ~> rightSink
+    source ~> dj0.in
+
+    dj0.left ~> errorSink
+    dj0.right ~> rightFlow ~> dj1.in
+
+    dj1.left ~> errorSink
+    dj1.right ~> rightSink
   }
 
   def start(): Unit = {

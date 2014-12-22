@@ -4,7 +4,7 @@ import akka.stream.scaladsl._
 import scala.collection.immutable
 import scalaz.\/
 
-final class DisjunctionRoute[A, B] extends FlexiRoute[A \/ B]("disjunction") {
+final class DisjunctionRoute[A, B](name: String) extends FlexiRoute[A \/ B](name) {
   import FlexiRoute._
 
   val left = createOutputPort[A]()
@@ -21,4 +21,8 @@ final class DisjunctionRoute[A, B] extends FlexiRoute[A \/ B]("disjunction") {
     }
     override def initialCompletionHandling = eagerClose
   }
+}
+
+object DisjunctionRoute {
+  def apply[A, B](name: String): DisjunctionRoute[A, B] = new DisjunctionRoute[A, B](name)
 }

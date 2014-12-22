@@ -7,13 +7,11 @@ import com.amazonaws.services.sqs.model.{ ReceiveMessageResult, ReceiveMessageRe
 import io.github.lvicentesanchez.rosetta.data.Request
 import scala.collection.JavaConverters._
 import scala.concurrent.{ Promise, Future }
-import scalaz.{ -\/, \/ }
-import scalaz.std.list._
-import scalaz.syntax.traverse._
+import scalaz.{ -\/, \/, \/- }
 
 trait SQSProducer {
-  def produce(queueUrl: String, client: AmazonSQSAsync)(polling: Int, bufferSize: Int): Future[String \/ List[Request]] = {
-    val promise: Promise[String \/ List[Request]] = Promise[String \/ List[Request]]()
+  def produce(queueUrl: String, client: AmazonSQSAsync)(polling: Int, bufferSize: Int): Future[String \/ List[String \/ Request]] = {
+    val promise: Promise[String \/ List[String \/ Request]] = Promise[String \/ List[String \/ Request]]()
     try {
       val request: ReceiveMessageRequest =
         new ReceiveMessageRequest().
@@ -25,13 +23,12 @@ trait SQSProducer {
           promise.trySuccess(-\/(exception.getMessage))
 
         override def onSuccess(request: ReceiveMessageRequest, result: ReceiveMessageResult): Unit =
-          promise.trySuccess(
+          promise.trySuccess(\/-(
             result.getMessages.iterator.asScala
               .map(msg => Parse.parse(msg.getBody).map(Request(msg.getReceiptHandle, _)))
-              .filter(_.isRight)
-              .toList.sequenceU
-          )
-      })
+              .toList
+          ))
+      } )
     } catch {
       case exception: Throwable => promise.trySuccess(-\/(exception.getMessage))
     }
