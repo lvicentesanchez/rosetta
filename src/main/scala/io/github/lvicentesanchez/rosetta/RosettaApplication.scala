@@ -35,9 +35,7 @@ object RosettaApplication extends ApplicationLifecycle {
   )
 
   GlobalSettings.loggingSQLAndTime = LoggingSQLAndTimeSettings(
-    enabled = false,
-    singleLineMode = true,
-    logLevel = 'debug
+    enabled = false
   )
   //
 
