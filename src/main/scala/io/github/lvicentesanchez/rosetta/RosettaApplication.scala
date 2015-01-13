@@ -62,15 +62,21 @@ object RosettaApplication extends ApplicationLifecycle {
   import FlowGraphImplicits._
 
   val graph = FlowGraph { implicit builder =>
-    val comm: DisjunctionRoute[String, List[String \/ LocalisedRequest]] = DisjunctionRoute[String, List[String \/ LocalisedRequest]]("comm-error")
-    val flat: DisjunctionRoute[String, LocalisedRequest] = DisjunctionRoute[String, LocalisedRequest]("flat-error")
-    val loca: DisjunctionRoute[(String, LocalisedRequest), TranslatedRequest] = DisjunctionRoute[(String, LocalisedRequest), TranslatedRequest]("loca-error")
+    val comm: DisjunctionRoute[String, List[String \/ LocalisedRequest]] =
+      DisjunctionRoute[String, List[String \/ LocalisedRequest]]("comm-error")
+    val flat: DisjunctionRoute[String, LocalisedRequest] =
+      DisjunctionRoute[String, LocalisedRequest]("flat-error")
+    val loca: DisjunctionRoute[(String, LocalisedRequest), TranslatedRequest] =
+      DisjunctionRoute[(String, LocalisedRequest), TranslatedRequest]("loca-error")
     val unz1: Unzip[String, LocalisedRequest] = Unzip[String, LocalisedRequest]("unz1-error")
-    val sqr1: DisjunctionRoute[(String, LocalisedRequest), LocalisedRequest] = DisjunctionRoute[(String, LocalisedRequest), LocalisedRequest]("sqr1-error")
+    val sqr1: DisjunctionRoute[(String, LocalisedRequest), LocalisedRequest] =
+      DisjunctionRoute[(String, LocalisedRequest), LocalisedRequest]("sqr1-error")
     val dbpr: DisjunctionRoute[String, TranslatedRequest] = DisjunctionRoute[String, TranslatedRequest]("dbpr-error")
-    val sqr2: DisjunctionRoute[(String, TranslatedRequest), TranslatedRequest] = DisjunctionRoute[(String, TranslatedRequest), TranslatedRequest]("sqr2-error")
+    val sqr2: DisjunctionRoute[(String, TranslatedRequest), TranslatedRequest] =
+      DisjunctionRoute[(String, TranslatedRequest), TranslatedRequest]("sqr2-error")
     val unz2: Unzip[String, TranslatedRequest] = Unzip[String, TranslatedRequest]("unz2-error")
-    val dbrm: DisjunctionRoute[String, TranslatedRequest] = DisjunctionRoute[String, TranslatedRequest]("dbrm-error")
+    val dbrm: DisjunctionRoute[String, TranslatedRequest] =
+      DisjunctionRoute[String, TranslatedRequest]("dbrm-error")
 
     //
     //                                      - logerro     - logerro                  - logerro    - logerro
