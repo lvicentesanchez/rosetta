@@ -35,7 +35,7 @@ val rootDependencies = Seq(
   "ch.qos.logback"             %  "logback-classic"          % "1.1.2",
   "ch.qos.logback"             %  "logback-core"             % "1.1.2",
   "com.amazonaws"              %  "aws-java-sdk-sqs"         % "1.9.13",
-  "joda-time"                  %  "joda-time"                % "2.6",
+  "com.h2database"             %  "h2"                       % "1.4.184",
   "com.github.nscala-time"     %% "nscala-time"              % "1.6.0",
   "com.typesafe"               %  "config"                   % "1.2.1",
   "com.typesafe.akka"          %% "akka-actor"               % "2.3.8",
@@ -43,9 +43,11 @@ val rootDependencies = Seq(
   "com.typesafe.akka"          %% "akka-stream-experimental" % "1.0-M1",
   "io.argonaut"                %% "argonaut"                 % "6.1-M5",
   "io.dropwizard.metrics"      %  "metrics-graphite"         % "3.1.0",
+  "joda-time"                  %  "joda-time"                % "2.6",
   "net.ceedubs"                %% "ficus"                    % "1.1.1",
   "org.joda"                   %  "joda-convert"             % "1.7",
-  "org.scalaz"                 %% "scalaz-core"              % "7.1.0"
+  "org.scalaz"                 %% "scalaz-core"              % "7.1.0",
+  "org.scalikejdbc"            %% "scalikejdbc"              % "2.2.1"
 )
 
 val dependencies =

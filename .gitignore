@@ -6,6 +6,7 @@ external/
 results/
 .lib-src/
 tags
+src/main/resources/application.conf
 
 # IntelliJ IDEA #
 ###################
