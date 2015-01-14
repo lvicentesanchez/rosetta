@@ -14,8 +14,4 @@ object RosettaFlows {
   def mapAsyncUnordered[A, B, C](fn: A => Future[B \/ C]): Flow[A, B \/ C] =
     Flow[A].
       mapAsyncUnordered(fn)
-
-  def persist[A](fn: A => Future[String \/ A]): Flow[A, String \/ A] =
-    Flow[A].
-      mapAsyncUnordered(fn)
 }
