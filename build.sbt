@@ -40,7 +40,7 @@ val rootDependencies = Seq(
   "com.typesafe"               %  "config"                   % "1.2.1",
   "com.typesafe.akka"          %% "akka-actor"               % "2.3.8",
   "com.typesafe.akka"          %% "akka-slf4j"               % "2.3.8",
-  "com.typesafe.akka"          %% "akka-stream-experimental" % "1.0-M1",
+  "com.typesafe.akka"          %% "akka-stream-experimental" % "1.0-M4",
   "io.argonaut"                %% "argonaut"                 % "6.1-M5",
   "io.dropwizard.metrics"      %  "metrics-graphite"         % "3.1.0",
   "joda-time"                  %  "joda-time"                % "2.6",

@@ -1,7 +1,7 @@
 package io.github.lvicentesanchez.rosetta
 
 import akka.actor.ActorSystem
-import akka.stream.FlowMaterializer
+import akka.stream._
 import akka.stream.scaladsl._
 import com.amazonaws.auth.BasicAWSCredentials
 import com.amazonaws.services.sqs.{ AmazonSQSAsyncClient, AmazonSQSAsync }
@@ -21,7 +21,7 @@ object RosettaApplication extends ApplicationLifecycle {
   val blocking: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(32))
   val config: RosettaConfig = RosettaConfig.reader(ConfigFactory.load())
   implicit val system = ActorSystem("rosetta")
-  implicit val materializer = FlowMaterializer()
+  implicit val materializer = ActorFlowMaterializer()
   //
   // Db initialisation
   //
@@ -42,10 +42,10 @@ object RosettaApplication extends ApplicationLifecycle {
   val client: AmazonSQSAsync =
     new AmazonSQSAsyncClient(new BasicAWSCredentials(config.sqs.accessKey, config.sqs.secretKey))
 
-  val source: Source[String \/ List[String \/ LocalisedRequest]] =
+  val source: Source[String \/ List[String \/ LocalisedRequest], Unit] =
     Source(() => Iterator.continually(())).mapAsyncUnordered(_ => sqs.produce(config.sqs.queueUrl, client)(20, 10))
 
-  def errorSink[A]: Sink[A] = Sink.foreach[A](err => println(s"::: ERROR ::: $err"))
+  def errorSink[A]: Sink[A, Future[Unit]] = Sink.foreach[A](err => println(s"::: ERROR ::: $err"))
 
   val sqlPersistFn: TranslatedRequest => Future[String \/ TranslatedRequest] =
     (a: TranslatedRequest) => Repository.persistTranslation(a)(blocking, AutoSession)
@@ -59,24 +59,35 @@ object RosettaApplication extends ApplicationLifecycle {
   def sqsRemoveFlow[A](fn: A => String): A => Future[(String, A) \/ A] =
     (a: A) => sqs.remove(config.sqs.queueUrl, client)(fn(a)).map(_.bimap((_, a), _ => a))(system.dispatcher)
 
-  import FlowGraphImplicits._
-
-  val graph = FlowGraph { implicit builder =>
-    val comm: DisjunctionRoute[String, List[String \/ LocalisedRequest]] =
+  val graph = FlowGraph.closed() { implicit builder =>
+    import FlowGraph.Implicits._
+    val comm = builder.add(
       DisjunctionRoute[String, List[String \/ LocalisedRequest]]("comm-error")
-    val flat: DisjunctionRoute[String, LocalisedRequest] =
+    )
+    val flat = builder.add(
       DisjunctionRoute[String, LocalisedRequest]("flat-error")
-    val loca: DisjunctionRoute[(String, LocalisedRequest), TranslatedRequest] =
+    )
+    val loca = builder.add(
       DisjunctionRoute[(String, LocalisedRequest), TranslatedRequest]("loca-error")
-    val unz1: Unzip[String, LocalisedRequest] = Unzip[String, LocalisedRequest]("unz1-error")
-    val sqr1: DisjunctionRoute[(String, LocalisedRequest), LocalisedRequest] =
+    )
+    val unz1 = builder.add(
+      Unzip[String, LocalisedRequest]()
+    )
+    val sqr1 = builder.add(
       DisjunctionRoute[(String, LocalisedRequest), LocalisedRequest]("sqr1-error")
-    val dbpr: DisjunctionRoute[String, TranslatedRequest] = DisjunctionRoute[String, TranslatedRequest]("dbpr-error")
-    val sqr2: DisjunctionRoute[(String, TranslatedRequest), TranslatedRequest] =
+    )
+    val dbpr = builder.add(
+      DisjunctionRoute[String, TranslatedRequest]("dbpr-error")
+    )
+    val sqr2 = builder.add(
       DisjunctionRoute[(String, TranslatedRequest), TranslatedRequest]("sqr2-error")
-    val unz2: Unzip[String, TranslatedRequest] = Unzip[String, TranslatedRequest]("unz2-error")
-    val dbrm: DisjunctionRoute[String, TranslatedRequest] =
+    )
+    val unz2 = builder.add(
+      Unzip[String, TranslatedRequest]()
+    )
+    val dbrm = builder.add(
       DisjunctionRoute[String, TranslatedRequest]("dbrm-error")
+    )
 
     //
     //                                      - logerro     - logerro                  - logerro    - logerro
@@ -90,32 +101,32 @@ object RosettaApplication extends ApplicationLifecycle {
 
     source ~> comm.in
 
-    comm.left ~> errorSink
-    comm.right ~> RosettaFlows.flatten[String \/ LocalisedRequest] ~> flat.in
+    comm.out0 ~> errorSink
+    comm.out1 ~> RosettaFlows.flatten[String \/ LocalisedRequest] ~> flat.in
 
-    flat.left ~> errorSink
-    flat.right ~> RosettaFlows.mapAsyncUnordered(translationFn) ~> loca.in
+    flat.out0 ~> errorSink
+    flat.out1 ~> RosettaFlows.mapAsyncUnordered(translationFn) ~> loca.in
 
-    loca.left ~> unz1.in
-    loca.right ~> RosettaFlows.mapAsyncUnordered(sqlPersistFn) ~> dbpr.in
+    loca.out0 ~> unz1.in
+    loca.out1 ~> RosettaFlows.mapAsyncUnordered(sqlPersistFn) ~> dbpr.in
 
-    unz1.left ~> errorSink
-    unz1.right ~> RosettaFlows.mapAsyncUnordered(sqsRemoveFlow[LocalisedRequest](_.handle)) ~> sqr1.in
+    unz1.out0 ~> errorSink
+    unz1.out1 ~> RosettaFlows.mapAsyncUnordered(sqsRemoveFlow[LocalisedRequest](_.handle)) ~> sqr1.in
 
-    sqr1.left ~> Flow[(String, LocalisedRequest)].map(_._1).to(errorSink)
-    sqr1.right ~> Sink.ignore
+    sqr1.out0 ~> Flow[(String, LocalisedRequest)].map(_._1).to(errorSink)
+    sqr1.out1 ~> Sink.ignore
 
-    dbpr.left ~> errorSink
-    dbpr.right ~> RosettaFlows.mapAsyncUnordered(sqsRemoveFlow[TranslatedRequest](_.handle)) ~> sqr2.in
+    dbpr.out0 ~> errorSink
+    dbpr.out1 ~> RosettaFlows.mapAsyncUnordered(sqsRemoveFlow[TranslatedRequest](_.handle)) ~> sqr2.in
 
-    sqr2.left ~> unz2.in
-    sqr2.right ~> Sink.ignore
+    sqr2.out0 ~> unz2.in
+    sqr2.out1 ~> Sink.ignore
 
-    unz2.left ~> errorSink
-    unz2.right ~> RosettaFlows.mapAsyncUnordered(sqlRemoveFn) ~> dbrm.in
+    unz2.out0 ~> errorSink
+    unz2.out1 ~> RosettaFlows.mapAsyncUnordered(sqlRemoveFn) ~> dbrm.in
 
-    dbrm.left ~> errorSink
-    dbrm.right ~> Sink.ignore
+    dbrm.out0 ~> errorSink
+    dbrm.out1 ~> Sink.ignore
   }
 
   def start(): Unit = {
